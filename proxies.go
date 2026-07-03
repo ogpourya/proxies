@@ -44,6 +44,11 @@ var sources = []string{
     "https://github.com/ShiftyTR/Proxy-List/raw/refs/heads/master/proxy.txt",
     "https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/http.txt",
     "https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/https.txt",
+    "https://github.com/vmheaven/VMHeaven.io-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
+    "https://github.com/dpangestuw/Free-Proxy/raw/refs/heads/main/All_proxies.txt",
+    "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt",
+    "https://github.com/VPSLabCloud/VPSLab-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
+    "https://github.com/hproxy-com/free-proxy-list/raw/refs/heads/main/all.txt",
 }
 
 
