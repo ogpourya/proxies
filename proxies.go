@@ -4,73 +4,70 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var sources = []string{
-    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
-    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt",
-    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
-    "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/all/data.txt",
-    "https://github.com/monosans/proxy-list/raw/refs/heads/main/proxies/all.txt",
-    "https://github.com/mmpx12/proxy-list/raw/refs/heads/master/proxies.txt",
-    "https://github.com/zloi-user/hideip.me/raw/refs/heads/master/http.txt",
-    "https://github.com/zloi-user/hideip.me/raw/refs/heads/master/https.txt",
-    "https://github.com/zloi-user/hideip.me/raw/refs/heads/master/socks4.txt",
-    "https://github.com/zloi-user/hideip.me/raw/refs/heads/master/socks5.txt",
-    "https://github.com/iplocate/free-proxy-list/raw/refs/heads/main/all-proxies.txt",
-    "https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/http.txt",
-    "https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/https.txt",
-    "https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/socks4.txt",
-    "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt",
-    "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks4.txt",
-    "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks5.txt",
-    "https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/http.txt",
-    "https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/socks4.txt",
-    "https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/socks5.txt",
-    "https://github.com/ShiftyTR/Proxy-List/raw/refs/heads/master/proxy.txt",
-    "https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/http.txt",
-    "https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/https.txt",
-    "https://github.com/vmheaven/VMHeaven.io-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
-    "https://github.com/dpangestuw/Free-Proxy/raw/refs/heads/main/All_proxies.txt",
-    "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt",
-    "https://github.com/VPSLabCloud/VPSLab-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
-    "https://github.com/hproxy-com/free-proxy-list/raw/refs/heads/main/all.txt",
+	"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
+	"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt",
+	"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/all/data.txt",
+	"https://github.com/monosans/proxy-list/raw/refs/heads/main/proxies/all.txt",
+	"https://github.com/mmpx12/proxy-list/raw/refs/heads/master/proxies.txt",
+	"https://github.com/zloi-user/hideip.me/raw/refs/heads/master/http.txt",
+	"https://github.com/zloi-user/hideip.me/raw/refs/heads/master/https.txt",
+	"https://github.com/zloi-user/hideip.me/raw/refs/heads/master/socks4.txt",
+	"https://github.com/zloi-user/hideip.me/raw/refs/heads/master/socks5.txt",
+	"https://github.com/iplocate/free-proxy-list/raw/refs/heads/main/all-proxies.txt",
+	"https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/http.txt",
+	"https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/https.txt",
+	"https://github.com/Zaeem20/FREE_PROXIES_LIST/raw/refs/heads/master/socks4.txt",
+	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt",
+	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks4.txt",
+	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks5.txt",
+	"https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/http.txt",
+	"https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/socks4.txt",
+	"https://github.com/rdavydov/proxy-list/raw/refs/heads/main/proxies/socks5.txt",
+	"https://github.com/ShiftyTR/Proxy-List/raw/refs/heads/master/proxy.txt",
+	"https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/http.txt",
+	"https://github.com/Vann-Dev/proxy-list/raw/refs/heads/main/proxies/https.txt",
+	"https://github.com/vmheaven/VMHeaven.io-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
+	"https://github.com/dpangestuw/Free-Proxy/raw/refs/heads/main/All_proxies.txt",
+	"https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt",
+	"https://github.com/VPSLabCloud/VPSLab-Free-Proxy-List/raw/refs/heads/main/all_proxies.txt",
+	"https://github.com/hproxy-com/free-proxy-list/raw/refs/heads/main/all.txt",
 }
 
-
-// Allowed protocols and defaults
 var (
 	validProto = map[string]bool{
-		"http":  true,
-		"https": true,
+		"http":   true,
+		"https":  true,
 		"socks4": true,
 		"socks5": true,
 	}
 
 	defaultPort = map[string]int{
-		"http":  80,
-		"https": 443,
+		"http":   80,
+		"https":  443,
 		"socks4": 1080,
 		"socks5": 1080,
 	}
 )
-
-// regex to validate final normalized proxy like "http://host:port" or "socks5://host:port"
-var proxyRegex = regexp.MustCompile(`(?i)^(http|https|socks4|socks5)://[^:/\s]+:\d{1,5}$`)
 
 func protoFromSourceURL(u string) string {
 	lu := strings.ToLower(u)
@@ -84,12 +81,12 @@ func protoFromSourceURL(u string) string {
 	case strings.Contains(lu, "/http") || strings.Contains(lu, "http.txt"):
 		return "http"
 	default:
-		return "" // unknown
+		return ""
 	}
 }
 
 func fetch(ctx context.Context, client *http.Client, url string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -99,263 +96,264 @@ func fetch(ctx context.Context, client *http.Client, url string) (io.ReadCloser,
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		resp.Body.Close()
-		return nil, fmt.Errorf("bad status %d", resp.StatusCode)
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}
 	return resp.Body, nil
 }
 
+// normalizeLine cleans, extracts, and validates proxy specifications without regex overhead.
 func normalizeLine(raw string, srcProto string) (string, bool) {
 	line := strings.TrimSpace(raw)
-	if line == "" {
-		return "", false
-	}
-	// Remove common comment markers or lines that obviously aren't proxies
-	if strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+	if line == "" || line[0] == '#' || line[0] == ';' {
 		return "", false
 	}
 
-	// If the line already contains a scheme (://), parse it and validate
+	// Strip trailing comments/whitespace (e.g. CSV fields or trailing notes)
+	if idx := strings.IndexAny(line, " \t,;#"); idx != -1 {
+		line = line[:idx]
+	}
+
+	proto := ""
+	hostPort := ""
+
 	if idx := strings.Index(line, "://"); idx != -1 {
-		p := strings.ToLower(line[:idx])
-		if !validProto[p] {
+		proto = strings.ToLower(line[:idx])
+		hostPort = line[idx+3:]
+	} else {
+		proto = srcProto
+		hostPort = line
+	}
+
+	if proto == "" {
+		proto = "http"
+	}
+
+	if !validProto[proto] {
+		return "", false
+	}
+
+	// Support userinfo (e.g. user:pass@host:port) if present
+	userinfo := ""
+	if at := strings.LastIndex(hostPort, "@"); at != -1 {
+		userinfo = hostPort[:at+1]
+		hostPort = hostPort[at+1:]
+	}
+
+	// Separate host and port
+	var host string
+	var port int
+
+	if strings.HasPrefix(hostPort, "[") {
+		// IPv6 bracketed: [::1]:8080 or [::1]
+		closeBracket := strings.Index(hostPort, "]")
+		if closeBracket == -1 {
 			return "", false
 		}
-		// Ensure there's a host:port after
-		hostPort := line[idx+3:]
-		hostPort = strings.TrimSpace(hostPort)
-		if hostPort == "" {
-			return "", false
-		}
-		// If no port, append default
-		if !strings.Contains(hostPort, ":") {
-			def, ok := defaultPort[p]
-			if !ok {
+		host = hostPort[:closeBracket+1]
+		remainder := hostPort[closeBracket+1:]
+		if remainder == "" {
+			port = defaultPort[proto]
+		} else if strings.HasPrefix(remainder, ":") {
+			p, err := strconv.Atoi(remainder[1:])
+			if err != nil || p <= 0 || p > 65535 {
 				return "", false
 			}
-			hostPort = hostPort + ":" + strconv.Itoa(def)
+			port = p
+		} else {
+			return "", false
 		}
-		candidate := fmt.Sprintf("%s://%s", p, hostPort)
-		if validateProxy(candidate) {
-			return candidate, true
+	} else {
+		// IPv4 or hostname
+		colon := strings.LastIndex(hostPort, ":")
+		if colon == -1 {
+			host = hostPort
+			port = defaultPort[proto]
+		} else {
+			host = hostPort[:colon]
+			p, err := strconv.Atoi(hostPort[colon+1:])
+			if err != nil || p <= 0 || p > 65535 {
+				return "", false
+			}
+			port = p
 		}
+	}
+
+	host = strings.TrimSpace(host)
+	if host == "" || strings.ContainsAny(host, " /\\?#") {
 		return "", false
 	}
 
-	// No scheme present in line.
-	// Try to split host and port.
-	line = strings.TrimSpace(line)
-	// If it's something like "host" (no colon), add default based on srcProto or http
-	if !strings.Contains(line, ":") {
-		p := srcProto
-		if p == "" {
-			p = "http"
-		}
-		def := defaultPort[p]
-		candidate := fmt.Sprintf("%s://%s:%d", p, line, def)
-		if validateProxy(candidate) {
-			return candidate, true
-		}
-		return "", false
-	}
-
-	// Contains colon -> assume host:port
-	// split at last colon to allow IPv6 like [::1]:8080 (but we won't fully parse IPv6)
-	last := strings.LastIndex(line, ":")
-	if last == -1 {
-		return "", false
-	}
-	host := strings.TrimSpace(line[:last])
-	portStr := strings.TrimSpace(line[last+1:])
-	if host == "" || portStr == "" {
-		return "", false
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil || port <= 0 || port > 65535 {
-		return "", false
-	}
-
-	p := srcProto
-	if p == "" {
-		p = "http"
-	}
-	candidate := fmt.Sprintf("%s://%s:%d", p, host, port)
-	if validateProxy(candidate) {
-		return candidate, true
-	}
-	return "", false
+	return fmt.Sprintf("%s://%s%s:%d", proto, userinfo, host, port), true
 }
 
-func validateProxy(s string) bool {
-	if !proxyRegex.MatchString(s) {
-		return false
+func newHTTPClient() *http.Client {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 	}
-	// ensure port value is in range
-	parts := strings.Split(s, ":")
-	if len(parts) < 2 {
-		return false
+	return &http.Client{
+		Transport: transport,
+		Timeout:   20 * time.Second,
 	}
-	pStr := parts[len(parts)-1]
-	p, err := strconv.Atoi(pStr)
-	if err != nil {
-		return false
-	}
-	return p >= 1 && p <= 65535
 }
 
-// fetchAll downloads sources concurrently and returns collected normalized proxies.
-func fetchAll(ctx context.Context, srcs []string) []string {
-	client := &http.Client{Timeout: 15 * time.Second}
-	type result struct {
-		url  string
-		body []string
-		err  error
-	}
-	ch := make(chan result)
-	var wg sync.WaitGroup
-	for _, u := range srcs {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			bodyRc, err := fetch(ctx, client, url)
-			if err != nil {
-				ch <- result{url: url, body: nil, err: err}
-				return
-			}
-			defer bodyRc.Close()
-			sc := bufio.NewScanner(bodyRc)
-			var lines []string
-			for sc.Scan() {
-				lines = append(lines, sc.Text())
-			}
-			// ignore scanner error; treat as failure if severe
-			ch <- result{url: url, body: lines, err: nil}
-		}(u)
-	}
-
-	// close channel when done
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	seen := make(map[string]struct{})
-	out := make([]string, 0, 1000)
-
-	for res := range ch {
-		// ignore failures
-		if res.err != nil {
-			// just skip this source
-			continue
-		}
-		srcProto := protoFromSourceURL(res.url)
-		for _, raw := range res.body {
-			norm, ok := normalizeLine(raw, srcProto)
-			if !ok {
-				continue
-			}
-			// normalize case for protocol (lowercase)
-			parts := strings.SplitN(norm, "://", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			key := strings.ToLower(parts[0]) + "://" + parts[1]
-			if _, exists := seen[key]; exists {
-				continue
-			}
-			seen[key] = struct{}{}
-			out = append(out, key)
-		}
-	}
-
-	// shuffle
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
-
-	return out
+// Streamed fetch results for responsive Bubble Tea UI
+type srcDoneMsg struct {
+	url     string
+	proxies []string
+	err     error
 }
 
-// saveToFile writes proxies to proxies.txt in current dir
-func saveToFile(proxies []string) error {
-	f, err := os.Create("proxies.txt")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	for _, p := range proxies {
-		_, _ = w.WriteString(p + "\n")
-	}
-	return w.Flush()
+type batchDoneMsg struct {
+	count int
+	err   error
 }
 
-// Bubble Tea UI
+// Bubble Tea UI Model
 type model struct {
 	spinner    spinner.Model
-	status     string
 	totalSrc   int
-	doneCount  int
-	errCount   int
+	completed  int
+	failed     int
+	collected  int
 	finished   bool
-	proxyCount int
 	err        error
-}
-
-type fetchDoneMsg struct {
-	finished bool
-	count    int
-	err      error
+	subChan    chan srcDoneMsg
+	collectedMap map[string]struct{}
+	collectedList []string
 }
 
 func initialModel(total int) model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = s.Style // keep default
 	return model{
-		spinner:  s,
-		status:   "Starting downloads...",
-		totalSrc: total,
+		spinner:       s,
+		totalSrc:      total,
+		subChan:       make(chan srcDoneMsg, total),
+		collectedMap:  make(map[string]struct{}, 10000),
+		collectedList: make([]string, 0, 10000),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	// start spinner and perform download in background
-	return tea.Batch(m.spinner.Tick, func() tea.Msg {
-		// run the heavy lifting synchronously inside this cmd so bubbletea can receive a message
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
+	client := newHTTPClient()
+	
+	// Start fetching sources concurrently in the background and streaming to subChan
+	fetchCmd := func() tea.Msg {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 16) // Concurrency limiter to avoid file descriptor / socket exhaustion
 
-		// We'll perform fetchAll but we also want to track progress per source.
-		// To keep things simple for UI we run fetchAll directly and then return a single done message.
-		proxies := fetchAll(ctx, sources)
-		if len(proxies) == 0 {
-			return fetchDoneMsg{finished: true, count: 0, err: errors.New("no proxies collected (all sources failed or filtered)")}
+		for _, srcURL := range sources {
+			wg.Add(1)
+			go func(u string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				defer cancel()
+
+				bodyRc, err := fetch(ctx, client, u)
+				if err != nil {
+					m.subChan <- srcDoneMsg{url: u, err: err}
+					return
+				}
+				defer func() { _ = bodyRc.Close() }()
+
+				srcProto := protoFromSourceURL(u)
+				var lines []string
+				sc := bufio.NewScanner(bodyRc)
+				// Allow reading lines up to 64KB
+				buf := make([]byte, 64*1024)
+				sc.Buffer(buf, 64*1024)
+
+				for sc.Scan() {
+					if norm, ok := normalizeLine(sc.Text(), srcProto); ok {
+						lines = append(lines, norm)
+					}
+				}
+				m.subChan <- srcDoneMsg{url: u, proxies: lines, err: sc.Err()}
+			}(srcURL)
 		}
-		if err := saveToFile(proxies); err != nil {
-			return fetchDoneMsg{finished: true, count: 0, err: err}
+
+		wg.Wait()
+		close(m.subChan)
+		return nil
+	}
+
+	// Command to listen on the stream channel
+	return tea.Batch(m.spinner.Tick, fetchCmd, waitForNextSource(m.subChan))
+}
+
+func waitForNextSource(sub chan srcDoneMsg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-sub
+		if !ok {
+			return batchDoneMsg{}
 		}
-		return fetchDoneMsg{finished: true, count: len(proxies), err: nil}
-	})
+		return msg
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case fetchDoneMsg:
-		m.finished = true
-		m.proxyCount = msg.count
-		m.err = msg.err
-		if m.err != nil {
-			m.status = "Finished with error ❌"
-		} else {
-			m.status = "All done ✅"
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "q" {
+			return m, tea.Quit
 		}
-		return m, tea.Quit
+		return m, nil
+
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+
+	case srcDoneMsg:
+		m.completed++
+		if msg.err != nil {
+			m.failed++
+		} else {
+			for _, p := range msg.proxies {
+				if _, exists := m.collectedMap[p]; !exists {
+					m.collectedMap[p] = struct{}{}
+					m.collectedList = append(m.collectedList, p)
+				}
+			}
+			m.collected = len(m.collectedList)
+		}
+		return m, waitForNextSource(m.subChan)
+
+	case batchDoneMsg:
+		m.finished = true
+		if len(m.collectedList) == 0 {
+			m.err = errors.New("no proxies collected (all sources failed or were unreachable)")
+			return m, tea.Quit
+		}
+
+		// Shuffle using modern crypto-seeded rand
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+		rng.Shuffle(len(m.collectedList), func(i, j int) {
+			m.collectedList[i], m.collectedList[j] = m.collectedList[j], m.collectedList[i]
+		})
+
+		// Atomic write to proxies.txt
+		if err := saveAtomic("proxies.txt", m.collectedList); err != nil {
+			m.err = err
+		}
+		return m, tea.Quit
+
 	default:
-		// ignore other messages
 		return m, nil
 	}
 }
@@ -363,22 +361,60 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	if m.finished {
 		if m.err != nil {
-			return fmt.Sprintf("\n💥 %s\n\nerror: %v\n\n", m.status, m.err)
+			return fmt.Sprintf("\n💥 Finished with error: %v\n\n", m.err)
 		}
-		return fmt.Sprintf("\n%s  🎉\nSaved %d proxies to %s\n\n", m.status, m.proxyCount, "proxies.txt")
+		return fmt.Sprintf("\nAll done ✅ 🎉\nSaved %d deduplicated proxies to proxies.txt (Sources: %d/%d ok)\n\n",
+			len(m.collectedList), m.totalSrc-m.failed, m.totalSrc)
 	}
-	return fmt.Sprintf("\n%s %s\n\n(Downloading sources: %d) — please wait...\n", m.spinner.View(), m.status, m.totalSrc)
+
+	return fmt.Sprintf("\n%s Downloading & parsing proxy sources (%d/%d done, %d unique found)...\n   Press Ctrl+C to abort\n",
+		m.spinner.View(), m.completed, m.totalSrc, m.collected)
+}
+
+// saveAtomic writes to a temporary file in the same directory and renames atomically.
+func saveAtomic(filename string, proxies []string) error {
+	dir := filepath.Dir(filename)
+	tmpFile, err := os.CreateTemp(dir, "proxies-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmpFile.Name()
+
+	cleanup := func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
+	}
+
+	w := bufio.NewWriterSize(tmpFile, 64*1024)
+	for _, p := range proxies {
+		if _, err := w.WriteString(p + "\n"); err != nil {
+			cleanup()
+			return err
+		}
+	}
+
+	if err := w.Flush(); err != nil {
+		cleanup()
+		return err
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		cleanup()
+		return err
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		cleanup()
+		return err
+	}
+
+	return os.Rename(tmpName, filename)
 }
 
 func main() {
-	// quick check: create module warning if no network libs present - but we'll run as-is
 	p := tea.NewProgram(initialModel(len(sources)))
-	if err := p.Start(); err != nil {
-		fmt.Printf("😵 failed: %v\n", err)
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "😵 Error running proxies: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println()
-	fmt.Println("👉 proxies saved to ./proxies.txt")
-	fmt.Println("You can open it with: cat proxies.txt")
 }
-
